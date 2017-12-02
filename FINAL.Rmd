@@ -1,0 +1,89 @@
+---
+title: "ESPM Final Project"
+author: "Yanlei feng"
+date: "11/26/2017"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## R Markdown
+
+This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+
+When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+
+```{r Radiometric Normalization}
+library(raster)
+library(rgdal)
+library(MASS)
+setwd("/Users/yanlei/Documents/PhD/P1A/ESPM244/Final Project/")
+# Relative radiometric normalization, single band
+# i_tbn: Image (single band) to be normalized
+# i_b: Base image to use for normalization (single band)
+# pir: pseudo invariant region (feature)
+# returns: normalized image (single band)
+i_b<- stack('i_base.tif')
+i_tbn<-stack('i_tbn.tif');
+```
+
+```{r}
+plotRGB(i_b, r=4, g=3, b=2, stretch='hist')
+xy <- click(i_b, n=10, xy=TRUE)
+pts <- matrix(nrow=10, ncol=2)
+pts[,1] <- xy[,1]
+pts[,2] <- xy[,2]
+```
+
+```{r}
+
+#Relative Radiometric Normalization for Single Band
+relNormalizeSB <- function(i_tbn, i_b, pts) {
+#extract Pseudo Invariant Feature (PIF) Points from base and target images
+base <- extract(i_b, pts)
+target <- extract(i_tbn, pts)
+#Apply linear regression on PIFs
+Regression<-lm( base ~ target);
+#Get coefficient from the linear regression results
+targetcoefficient<- summary(Regression)$coefficients[2,1];
+intercept<- summary(Regression)$coefficients[1,1];
+#Compute coefficients for target and intercept that minimizes error in targetcoefficient*i_tbn + intercept = i_b
+i_n<- i_tbn*targetcoefficient+intercept
+return (i_n)
+}
+
+#testn<- relNormalizeSB(i_tbn[[1]], i_b[[1]], pts)
+#par(mfrow=c(2,1))
+#plot(i_tbn[[1]])
+#plot(testn[[1]])
+
+
+# # relative radiometric normalization, multiband
+# # i_tbn: Image (multiband) to be normalized.
+# # tbn: to be normalized
+# # i_b: Base image to use for normalization
+# # pts: pseudo invariant regions (feature)
+# # n: number of bands to normalize. Eg, if nb=3,
+# # the first, second and third bands will be normalized
+# # and a three-band image will be returned.
+# # returns: normalized image
+
+relNormalizeMB<- function(i_tbn, i_b, pts, n){
+  rni <- relNormalizeSB(i_tbn[[1]], i_b[[1]], pts);
+  # Iterate over the rest of the bands
+  for (b in 1:n) {
+    rni = addLayer(rni, relNormalizeSB(i_tbn[[b]], i_b[[b]], pts))
+  }
+return (rni)
+}
+# 
+# normalize i_tbn image (7 bands)
+i_norm <- relNormalizeMB(i_tbn, i_b, pts, 6);
+par(mfrow=c(2,2))
+plotRGB(i_tbn, r=4, g=3, b=2, stretch = "lin")
+plotRGB(i_b, r=4, g=3, b=2, stretch = "lin")
+plotRGB(i_norm, r=4, g=3, b=2, stretch = "lin")
+```
+
